@@ -1,0 +1,193 @@
+Build a Grant Tagging System that categorizes and displays tags for grants
+we want to build a tagging system that classifies each grant based on its description
+In this tagging system, we should be able to add new grants with descriptions. 
+The system should assign tags from a pre-existing list, then display all the grants in the system on the frontend in an easily understandable format.
+create a React frontend and python backend(Flask) to accomplish the functionality in the problem statement.
+
+	1)Frontend
+		Grant Entry(Admin tab):
+			Users should have the ability to add new grants to the system on the frontend. Each grant includes:
+				grant_name
+				grant_description
+			The frontend should be able to take in this information, parse it, then send it to the backend.
+			The frontend should have a separate tab(Admin tab) that: 
+				add grants to the system
+					2 grant addition options:
+						json input file upload form
+							see the 'Input json format example' for details
+						input field with 'name' and 'description' text fields and a 'Add Grant' button
+				renders the grants stored on the backend(GrantsTable component).
+					shows a table with columns 'Grant name', 'Grant Description', 'Tags'
+					filter the results by selected tags
+						use a multiselect ui component
+							the possible tags should be loaded from the database
+						if a filter is applied, reload the table with new data
+					if a new grant is added, rerender the table
+		
+		Grant Display(Users tab):
+			The frontend should have a separate tab(Users tab): 
+				that renders the grants stored on the backend.
+					use the GrantsTable React component
+			
+		Additional considerations:
+			use the most recent React best practises server actions, etc which produces the fastest page loads
+				use Suspense and lazy loading if possible 
+			use TypeScript instead of JS
+			use Tailwind CSS for styling
+			use ShadCn for UI components
+			Use Zod for runtime validation where needed
+			Use `react-hook-form` for all form state management.
+			Use `@hookform/resolvers/zod` to connect zod schemas to react-hook-form.
+			Define the form schema with zod at the top of the file, with block comments for each field.
+			Show validation errors under each field using shadcn's `FormMessage` or similar.
+			All form submit handlers must be async and handle errors gracefully.
+			do not implement user register/login logic
+			use the GrantsTable React component both on User and Admin tabs
+			ignore the 'website_urls' and 'document_urls' json fields in the Input json
+			
+		Input json format example:
+			[
+				{
+					"grant_name": "Nutrient Management Farmer Education Grants",
+					"grant_description": "The Nutrient Management Farmer Education Grant Program supports nutrient management planning in Wisconsin by funding entities to educate farmers. Its goal is to enable farmers to write their own nutrient management plans and improve their understanding of nutrient management principles. Projects focus on compliance with the 2015 NRCS 590 nutrient management plan standards.",
+					"website_urls": ["https://datcp.wi.gov/Pages/Programs_Services/NMFEGrants.aspx"],
+					"document_urls": ["https://datcp.wi.gov/Documents2/NMFERFA.pdf"]
+				  },
+				  ...
+			]
+			
+	2) Backend
+		Add grants: 
+			The backend should have an API function that receives a JSON object of grants.
+				each grant have a 'grant_name' and a 'grant_description' field
+			The system should then assign tags from a predefined list of tags stored in the backend to each of these grants
+				the predefined tags should be located in a python list of strings, not in the database
+				an LLM based approach(Gemini API) is responsible for the tagging
+			Finally, these grants should be stored in a MongoDb database on the backend
+				Each grant stored on the backend should include:
+					grant_name — string
+					grant_description — string
+					tags — array of strings
+		
+		Get grants:
+			it retrieves the requested grants
+			an input tags(multiple) filter to return only the filtered elements 
+			it returns grant_name,grant_description,tags from the database
+					
+		Additional considerations:
+			-use python Flask for backend
+			-use server side validation for each input
+					
+		Pre-defined Tags
+			[
+			  "agriculture",
+			  "aquaculture",
+			  "capacity-building",
+			  "capital",
+			  "climate",
+			  "community-benefit",
+			  "conservation",
+			  "cost-share",
+			  "dairy",
+			  "distribution",
+			  "drought",
+			  "education",
+			  "equipment",
+			  "equine",
+			  "equine-owners",
+			  "food-safety",
+			  "farmer",
+			  "farm-to-school",
+			  "grant",
+			  "infrastructure",
+			  "irrigation",
+			  "local-food",
+			  "local-government",
+			  "logistics",
+			  "marketing",
+			  "mixed-operations",
+			  "nonprofit",
+			  "nutrient-management",
+			  "operational",
+			  "organic-certification",
+			  "organic-transition",
+			  "outreach",
+			  "planning",
+			  "pilot",
+			  "producer-group",
+			  "procurement",
+			  "processing",
+			  "research",
+			  "resilience",
+			  "reimbursement",
+			  "rolling",
+			  "rural",
+			  "safety-net",
+			  "school",
+			  "seafood",
+			  "seafood-harvester",
+			  "soil",
+			  "supply-chain",
+			  "technical-assistance",
+			  "training",
+			  "value-added",
+			  "water",
+			  "water-storage",
+			  "working-capital",
+			  "row-crops",
+			  "vegetables",
+			  "fruit",
+			  "livestock",
+			  "competitive",
+			  "match-required",
+			  "public-entity-eligible",
+			  "individual-eligible",
+			  "rfa-open",
+			  "wi",
+			  "va",
+			  "ri",
+			  "nh",
+			  "mn",
+			  "me",
+			  "ky",
+			  "co",
+			  "cooperative",
+			  "for-profit",
+			  "university",
+			  "extension",
+			  "tribal",
+			  "veteran",
+			  "beginning-farmer",
+			  "underserved",
+			  "youth",
+			  "food-access",
+			  "nutrition",
+			  "workforce",
+			  "energy",
+			  "renewable-energy",
+			  "water-quality",
+			  "soil-health",
+			  "wildlife-habitat",
+			  "pasture",
+			  "grazing",
+			  "manure-management",
+			  "disaster-relief",
+			  "flood"
+			]
+
+		
+					
+	Misc	
+		The Frontend and backend is located under the same root project directory
+		All code must be thoroughly commented and self-explanatory
+		
+	Create a Docker compose for the project
+	Create a readme file for instructions for running the project
+
+---------------
+
+Make the design similar to the attached screenshots
+	-do not change the content of the pages only the design
+	-improve a layout for every page if needed
+	-use the colors, text sizes, font types, etc from the attached image
+	-use TailwindCss everywhere if possible otherwise scss

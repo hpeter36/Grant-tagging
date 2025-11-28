@@ -1,0 +1,53 @@
+[
+  {
+    "grant_name": "Nutrient Management Farmer Education Grants",
+    "grant_description": "The Nutrient Management Farmer Education Grant Program supports nutrient management planning in Wisconsin by funding entities to educate farmers. Its goal is to enable farmers to write their own nutrient management plans and improve their understanding of nutrient management principles. Projects focus on compliance with the 2015 NRCS 590 nutrient management plan standards.",
+    "website_urls": ["https://datcp.wi.gov/Pages/Programs_Services/NMFEGrants.aspx"],
+    "document_urls": ["https://datcp.wi.gov/Documents2/NMFERFA.pdf"]
+  },
+  {
+    "grant_name": "AFID Infrastructure Program",
+    "grant_description": "The AFID Infrastructure Program provides grants for community infrastructure development projects that support local food production and sustainable agriculture. These projects must demonstrate a broad community benefit and are primarily used for capital expenditures.",
+    "website_urls": ["https://www.vdacs.virginia.gov/agriculture-afid-infrastructure-grants.shtml"],
+    "document_urls": ["https://www.vdacs.virginia.gov/pdf/AFID-infrastructure-grant-guidelines.pdf"]
+  },
+  {
+    "grant_name": "Local Agriculture and Seafood Act (LASA) Grants Program",
+    "grant_description": "The LASA Grants Program aims to enhance the economic competitiveness of Rhode Island's agricultural products and local seafood. It provides support to farmers and organizations to develop a sustainable food system and improve marketing efforts. Eligible projects should align with the program's goals, such as marketing assistance and food safety improvements.",
+    "website_urls": ["https://dem.ri.gov/agriculture/grants/lasa"],
+    "document_urls": ["https://dem.ri.gov/sites/g/files/xkgbur861/files/2024-10/lasa-presentation-2025.pdf"]
+  },
+  {
+    "grant_name": "NH Farm to School Local Food Incentive Pilot Program",
+    "grant_description": "The NH Farm to School Local Food Incentive Pilot Program aims to increase the use of New Hampshire products in school meal programs by enhancing collaboration between NH schools and producers. It involves purchasing local, minimally processed foods for school breakfasts, lunches, or fresh fruit and vegetable programs. The program is designed to connect schools with producers and support the procurement process.",
+    "website_urls": ["https://www.agriculture.nh.gov/divisions/agricultural-development/grant-program.htm"],
+    "document_urls": ["https://www.agriculture.nh.gov/publications-forms/documents/rfa-2025-farmtoschool.pdf"]
+  },
+  {
+    "grant_name": "Minnesota Transition to Organic Cost-Share Program",
+    "grant_description": "This program supports Minnesota farmers transitioning to organic farming by reimbursing costs associated with working with an organic certifying agency during the transition period. It aims to enhance farmer confidence and success in becoming fully certified organic.",
+    "website_urls": ["https://www.mda.state.mn.us/minnesota-transition-organic-cost-share-program"],
+    "document_urls": ["https://www.mda.state.mn.us/sites/default/files/docs/2024-04/MNtransitionorganic2024application.pdf"]
+  },
+  {
+    "grant_name": "Farmers Drought Relief Fund",
+    "grant_description": "The Farmers Drought Relief Fund aims to assist Maine farmers in overcoming the adverse effects of drought by providing grants for developing agricultural water management plans and installing agricultural water sources. Projects should focus on sustainable irrigation for cropland.",
+    "website_urls": ["https://www.maine.gov/dacf/ard/grants/farmers-drought-relief-program.shtml"],
+    "document_urls": ["https://www.maine.gov/DACF/ard/grants/documents/fdrf-rfa-2025.pdf"]
+  },
+  {
+    "grant_name": "Farm to Fork - Kentucky",
+    "grant_description": "The Farm to Fork program in Kentucky aims to increase awareness and support for the local food movement by encouraging organizations to host dinners that showcase 100 percent local farms, farmers, producers, and Kentucky Proud products. These events highlight the benefits of farm-to-table initiatives while benefiting a local charity, promoting community engagement with locally sourced agricultural products.",
+    "website_urls": ["https://www.kyagr.com/marketing/farm-to-fork.html"],
+    "document_urls": ["https://www.kyagr.com/marketing/documents/KYP_Fork_BrandGuidelines.pdf"]
+  },
+  {
+    "grant_name": "Equine Welfare Assistance",
+    "grant_description": "The Equine Welfare Assistance Grant aims to enhance the well-being of Colorado's domestic equines by funding projects and programs that support safety net initiatives, adoption programs, education, and awareness related to equine welfare. Eligible projects include education, outreach, safety net programs to keep equines in their homes, community support, and adoption promotion.",
+    "website_urls": ["https://ag.colorado.gov/press-release/equine-welfare-assistance-grant-accepting-applications"],
+    "document_urls": [
+      "https://docs.google.com/presentation/d/1UWl-RINuX5kuvI6c4ptLXlcHiPvAmKb5qq8MXaPegT8/edit?usp=sharing",
+      "https://docs.google.com/document/d/16deB-mJ5oBpmt46yQDuAzdoSXgGHR1vy_oOKOH7nc4U/edit?usp=sharing"
+    ]
+  }
+]
