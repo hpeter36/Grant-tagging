@@ -2,24 +2,32 @@
 
 Full-stack example that classifies and stores agricultural grants with LLM-filtered tags.
 
-Project creation process
+## Project Creation Process
 
-   I included TailwindCss and ShadCn and Zod, react-hook-form to the project which are common choice and best practise in this frontend stack. 
-   I used Flask and Mongo db for backend, Flask is a common choice next to Django, I use it for years and I am satisfied with that.
-   Mongodb is ideal for storing unstructured data and easy to set up, that is why I choosed it
+### Technology Choices
 
-  -I created a detailed prompt "ai_prompts.txt" for Cursor Agent, I used Auto option, hopefully done it with free tier(~1 hour)
-      -1 for creating the project
-      -1 for refining the design
-  -project generation(~15 min)
-  -my local docker collapsed was in error state so I needed to run it locally(~1hour)
-    -install MongoDb
-    -install python env, deps
-    -install React deps
-      -trouble with Tailwind version, downgraded to v3
-  -refining design, layout(~30 min)
+- **Frontend**: Tailwind CSS, shadcn-style components, Zod, and react-hook-form were selected as common best practices for this frontend stack.
+- **Backend**: Flask and MongoDB were chosen for the backend. Flask is a lightweight alternative to Django, and MongoDB is ideal for storing unstructured data with easy setup.
 
-  I tested only with keyword based tagging, I included both option, I use only free tier Gemini
+### Development Timeline
+
+- **AI-Assisted Development** (~1 hour):
+  - Created detailed prompt in `ai_prompts.txt` for Cursor Agent using Auto option (free tier)
+  - Initial project generation (~15 minutes)
+  - Design refinement iteration
+- **Local Setup** (~1 hour):
+  - Installed MongoDB locally
+  - Set up Python virtual environment and dependencies
+  - Installed React dependencies
+  - Resolved Tailwind CSS version compatibility (downgraded to v3)
+- **Design Refinement** (~30 minutes):
+  - Layout adjustments and styling improvements
+
+### Testing Notes
+
+- Tested with keyword-based tagging fallback (heuristic approach)
+- Both LLM-based (Gemini) and keyword-based tagging options are included
+- Currently using free tier Gemini API
 
 ## Stack
 
