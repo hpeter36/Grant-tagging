@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "grants_db")
 MONGO_COLLECTION_NAME = os.getenv("MONGO_COLLECTION_NAME", "grants")
+MONGO_TAGS_COLLECTION_NAME = os.getenv("MONGO_TAGS_COLLECTION_NAME", "tags")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
@@ -43,7 +44,7 @@ GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 # Predefined tags (NOT in database by design)
 ###############################################################################
 
-PREDEFINED_TAGS: List[str] = [
+INITIAL_PREDEFINED_TAGS: List[str] = [
     "agriculture",
     "aquaculture",
     "capacity-building",
@@ -150,6 +151,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 mongo_client = MongoClient(MONGO_URI)
 mongo_db = mongo_client[MONGO_DB_NAME]
 grants_collection = mongo_db[MONGO_COLLECTION_NAME]
+tags_collection = mongo_db[MONGO_TAGS_COLLECTION_NAME]
 
 
 ###############################################################################
@@ -243,6 +245,31 @@ def validate_grant_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
 
     return result
 
+def get_all_tags_from_db() -> Set[str]:
+    """Retrieve all tags from the database."""
+    return {doc["name"] for doc in tags_collection.find({}, {"name": 1, "_id": 0})}
+
+def add_new_tags_to_db(new_tags: List[str]):
+    """Adds new tags to the database, avoiding duplicates."""
+    existing_tags = get_all_tags_from_db()
+    to_insert = []
+    for tag in new_tags:
+        normalized_tag = tag.strip().lower().replace("_", "-")
+        if normalized_tag and normalized_tag not in existing_tags:
+            to_insert.append({"name": normalized_tag})
+            existing_tags.add(normalized_tag)  # Add to set to prevent duplicates within the same batch
+    if to_insert:
+        tags_collection.insert_many(to_insert)
+        logger.info(f"Added {len(to_insert)} new tags to the database.")
+
+def initialize_tags_if_empty():
+    """Populates the tags collection with initial predefined tags if it's empty."""
+    if tags_collection.count_documents({}) == 0:
+        logger.info("Tags collection is empty, populating with initial predefined tags.")
+        initial_tag_documents = [{"name": tag} for tag in INITIAL_PREDEFINED_TAGS]
+        tags_collection.insert_many(initial_tag_documents)
+    else:
+        logger.info("Tags collection already contains data, skipping initial population.")
 
 def call_gemini_for_tags(
     description: str,
@@ -260,8 +287,11 @@ def call_gemini_for_tags(
         require_llm: If True, only use LLM (no heuristic fallback). Required when sources are provided.
 
     Returns:
-        List of validated tags from PREDEFINED_TAGS
+        List of validated tags from the database.
     """
+    # Fetch current predefined tags from the database
+    db_predefined_tags = get_all_tags_from_db()
+    
     has_sources = (website_urls and len(website_urls) > 0) or (document_urls and len(document_urls) > 0)
     
     if require_llm or has_sources:
@@ -269,7 +299,7 @@ def call_gemini_for_tags(
             if has_sources:
                 raise ValueError(
                     "GEMINI_API_KEY is required when website_urls or document_urls are provided. "
-                    "LLM-based tagging is necessary to process external sources."
+                    "LLM-based tagging is necessary to process external sources and discover new tags."
                 )
             logger.warning("GEMINI_API_KEY is not set; falling back to heuristic tags.")
             return heuristic_tags(description)
@@ -284,12 +314,21 @@ def call_gemini_for_tags(
         
         # Build prompt with description and sources
         prompt_parts = [
-            "You are a grant tagging classifier.\n"
-            "Given the following grant information, choose ALL relevant tags from "
-            "this predefined list ONLY (no new tags):\n"
-            f"{PREDEFINED_TAGS}\n\n"
-            "Return ONLY a JSON array of strings, e.g. [\"agriculture\", \"education\"]. "
-            "Do not include any additional text.\n\n"
+            "You are a grant tagging classifier and new tag discoverer.\n"
+            "Given the following grant information, first choose ALL relevant tags from "
+            "this predefined list ONLY:\n"
+            f"{list(db_predefined_tags)}\n\n" # Use list(db_predefined_tags) here
+            "SECONDLY, if the website URLs or document URLs contain significant concepts "
+            "that are NOT adequately covered by the predefined tags, suggest up to 3 "
+            "GENUINELY NEW and distinct tags. These new tags should be concise (1-3 words), "
+            "hyphenated (e.g., 'climate-resilience', 'urban-farming'), and in lowercase. "
+            "Only suggest new tags if they introduce a critical, unrepresented concept "
+            "from the provided sources. DO NOT invent tags if existing ones are sufficient, "
+            "and DO NOT suggest duplicates or near-synonyms of existing tags.\n\n"
+            "Return ONLY a JSON object {...} with two keys: 'existing_tags' (an array of strings "
+            "from the predefined list) and 'newly_discovered_tags' (an array of strings "
+            "for genuinely new tags, or an empty array if none are found). "
+            "Do not include any additional text outside the JSON.\n\n"
             f"Grant description:\n{description}"
         ]
         
@@ -301,7 +340,8 @@ def call_gemini_for_tags(
         
         prompt_parts.append(
             "\n\nAnalyze the grant description and the provided sources (if any) to extract "
-            "all relevant tags. Consider information from all sources when determining tags."
+            "all relevant tags and discover new ones. Consider information from all sources "
+            "when determining tags and suggesting new ones."
         )
         
         prompt = "".join(prompt_parts)
@@ -310,34 +350,57 @@ def call_gemini_for_tags(
         text = (response.text or "").strip()
         logger.debug("Gemini raw response: %s", text)
 
-        # Try to parse JSON array from the response text.
+        # Try to parse JSON object from the response text.
         import json
         import re
 
-        # Clean up response - remove markdown code blocks if present
-        text_clean = re.sub(r"^```json\s*", "", text, flags=re.MULTILINE)
-        text_clean = re.sub(r"^```\s*", "", text_clean, flags=re.MULTILINE)
+        # Clean up response - remove markdown code blocks and 'json' prefix if present
+        text_clean = re.sub(r"^\s*", "", text, flags=re.MULTILINE)
+        text_clean = re.sub(r"^```", "", text_clean, flags=re.MULTILINE)
+        text_clean = re.sub(r"^(json\s*:?[\n]*)?", "", text_clean, flags=re.IGNORECASE)
         text_clean = text_clean.strip()
 
-        tags = json.loads(text_clean)
-        if not isinstance(tags, list):
-            raise ValueError("Gemini response is not a list.")
+        #print(f"--- {text_clean} ---")
+        parsed_response = json.loads(text_clean)
+        
+        if not isinstance(parsed_response, dict) or "existing_tags" not in parsed_response or "newly_discovered_tags" not in parsed_response:
+            raise ValueError("Gemini response is not a valid JSON object with 'existing_tags' and 'newly_discovered_tags'.")
 
-        # Normalize + filter to the allowed set and deduplicate
-        normalized = []
-        seen = set()
-        for t in tags:
+        raw_existing_tags = parsed_response["existing_tags"]
+        raw_newly_discovered_tags = parsed_response["newly_discovered_tags"]
+
+        if not isinstance(raw_existing_tags, list) or not isinstance(raw_newly_discovered_tags, list):
+            raise ValueError("Gemini response 'existing_tags' or 'newly_discovered_tags' are not lists.")
+
+        # Normalize + filter existing tags to the allowed set and deduplicate
+        validated_existing_tags = []
+        seen_tags = set()
+        for t in raw_existing_tags:
             if not isinstance(t, str):
                 continue
-            tag = t.strip().lower()
-            # Check for exact match or near-synonyms (normalize hyphens/underscores)
-            tag_normalized = tag.replace("_", "-")
-            if tag_normalized in PREDEFINED_TAGS and tag_normalized not in seen:
-                normalized.append(tag_normalized)
-                seen.add(tag_normalized)
+            tag = t.strip().lower().replace("_", "-")
+            if tag in db_predefined_tags and tag not in seen_tags:
+                validated_existing_tags.append(tag)
+                seen_tags.add(tag)
 
-        if normalized:
-            return normalized
+        # Process newly discovered tags
+        newly_discovered_and_validated_tags = []
+        if has_sources: # Only discover new tags if sources are provided
+            add_new_tags_to_db(raw_newly_discovered_tags)
+            # Re-fetch all tags after adding new ones to ensure we have the most up-to-date list
+            updated_db_tags = get_all_tags_from_db()
+            for t in raw_newly_discovered_tags:
+                if not isinstance(t, str):
+                    continue
+                tag = t.strip().lower().replace("_", "-")
+                if tag in updated_db_tags and tag not in seen_tags: # Check against updated_db_tags
+                    newly_discovered_and_validated_tags.append(tag)
+                    seen_tags.add(tag) # Add to seen to avoid duplicates if Gemini suggests an existing tag
+
+        combined_tags = list(seen_tags) # All unique tags found (existing + newly discovered)
+
+        if combined_tags:
+            return combined_tags
         
         # If LLM required but returned empty, still fall back if allowed
         if require_llm or has_sources:
@@ -351,7 +414,6 @@ def call_gemini_for_tags(
         logger.exception("Gemini tagging failed, using heuristic fallback: %s", exc)
         return heuristic_tags(description)
 
-
 def heuristic_tags(description: str) -> List[str]:
     """
     Very crude keyword-based fallback tagger.
@@ -359,7 +421,11 @@ def heuristic_tags(description: str) -> List[str]:
     """
     desc_lc = description.lower()
     guesses: List[str] = []
-    for tag in PREDEFINED_TAGS:
+    
+    # Fetch tags from DB for heuristic matching
+    db_predefined_tags = get_all_tags_from_db()
+
+    for tag in db_predefined_tags:
         key = tag.replace("-", " ")
         if key in desc_lc and tag not in guesses:
             guesses.append(tag)
@@ -381,8 +447,8 @@ def get_tags() -> Any:
     """
     Return the predefined list of tags used by the system.
     """
-    return jsonify({"tags": PREDEFINED_TAGS}), 200
-
+    db_tags = get_all_tags_from_db()
+    return jsonify({"tags": list(db_tags)}), 200 # Convert set to list for JSON response
 
 @app.route("/api/grants", methods=["POST"])
 def add_grants() -> Any:
@@ -399,7 +465,7 @@ def add_grants() -> Any:
 
     The backend will:
     - Validate input
-    - Call Gemini to assign tags from PREDEFINED_TAGS
+    - Call Gemini to assign tags from INITIAL_PREDEFINED_TAGS
     - Store to MongoDB
     - Return the stored documents (excluding Mongo's internal _id)
     """
@@ -509,6 +575,7 @@ def list_grants() -> Any:
 
 
 if __name__ == "__main__":
+    initialize_tags_if_empty() # New line: Initialize tags at startup
     # Default to port 5000 for local dev; docker-compose can override with env.
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)
 
