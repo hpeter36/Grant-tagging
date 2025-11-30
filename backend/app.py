@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -36,7 +36,7 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "grants_db")
 MONGO_COLLECTION_NAME = os.getenv("MONGO_COLLECTION_NAME", "grants")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 
 ###############################################################################
@@ -156,11 +156,42 @@ grants_collection = mongo_db[MONGO_COLLECTION_NAME]
 # Helper functions
 ###############################################################################
 
-def validate_grant_payload(raw: Dict[str, Any]) -> Dict[str, str]:
+def validate_url(url: str, must_be_pdf: bool = False) -> bool:
+    """
+    Validate a URL string.
+    
+    Args:
+        url: URL string to validate
+        must_be_pdf: If True, URL must point to a PDF file
+    
+    Returns:
+        True if valid, False otherwise
+    """
+    if not isinstance(url, str) or not url.strip():
+        return False
+    
+    url = url.strip()
+    
+    # Basic URL format check
+    if not url.startswith(("http://", "https://")):
+        return False
+    
+    # PDF check if required
+    if must_be_pdf:
+        url_lower = url.lower()
+        # Check if URL ends with .pdf or has .pdf in path
+        if not (url_lower.endswith(".pdf") or ".pdf?" in url_lower or ".pdf#" in url_lower):
+            return False
+    
+    return True
+
+
+def validate_grant_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate a single grant payload.
 
-    Returns a normalized dict with required fields or raises ValueError.
+    Returns a normalized dict with required fields and optional sources.
+    Raises ValueError on validation failure.
     """
     if not isinstance(raw, dict):
         raise ValueError("Each grant must be an object.")
@@ -173,19 +204,76 @@ def validate_grant_payload(raw: Dict[str, Any]) -> Dict[str, str]:
     if not isinstance(desc, str) or not desc.strip():
         raise ValueError("grant_description must be a non-empty string.")
 
-    return {
+    result: Dict[str, Any] = {
         "grant_name": name.strip(),
         "grant_description": desc.strip(),
     }
 
+    # Validate website_urls if provided
+    website_urls = raw.get("website_urls")
+    if website_urls is not None:
+        if not isinstance(website_urls, list):
+            raise ValueError("website_urls must be an array of strings.")
+        validated_websites = []
+        for idx, url in enumerate(website_urls):
+            if not isinstance(url, str):
+                continue  # Skip invalid entries
+            if validate_url(url, must_be_pdf=False):
+                validated_websites.append(url.strip())
+            else:
+                logger.warning(f"Invalid website URL at index {idx}, ignoring: {url}")
+        if validated_websites:
+            result["website_urls"] = validated_websites
 
-def call_gemini_for_tags(description: str) -> List[str]:
-    """
-    Call Gemini API to classify a grant description into predefined tags.
+    # Validate document_urls if provided
+    document_urls = raw.get("document_urls")
+    if document_urls is not None:
+        if not isinstance(document_urls, list):
+            raise ValueError("document_urls must be an array of strings.")
+        validated_docs = []
+        for idx, url in enumerate(document_urls):
+            if not isinstance(url, str):
+                continue  # Skip invalid entries
+            if validate_url(url, must_be_pdf=True):
+                validated_docs.append(url.strip())
+            else:
+                logger.warning(f"Invalid document URL at index {idx}, ignoring: {url}")
+        if validated_docs:
+            result["document_urls"] = validated_docs
 
-    If Gemini is not configured or something goes wrong, fall back to a very
-    naive keyword-based tag guesser based on substring matches.
+    return result
+
+
+def call_gemini_for_tags(
+    description: str,
+    website_urls: Optional[List[str]] = None,
+    document_urls: Optional[List[str]] = None,
+    require_llm: bool = False,
+) -> List[str]:
     """
+    Call Gemini API to classify a grant description and optional sources into predefined tags.
+
+    Args:
+        description: Grant description text
+        website_urls: Optional list of website URLs to analyze
+        document_urls: Optional list of PDF document URLs to analyze
+        require_llm: If True, only use LLM (no heuristic fallback). Required when sources are provided.
+
+    Returns:
+        List of validated tags from PREDEFINED_TAGS
+    """
+    has_sources = (website_urls and len(website_urls) > 0) or (document_urls and len(document_urls) > 0)
+    
+    if require_llm or has_sources:
+        if not GEMINI_API_KEY:
+            if has_sources:
+                raise ValueError(
+                    "GEMINI_API_KEY is required when website_urls or document_urls are provided. "
+                    "LLM-based tagging is necessary to process external sources."
+                )
+            logger.warning("GEMINI_API_KEY is not set; falling back to heuristic tags.")
+            return heuristic_tags(description)
+
     if not GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY is not set; falling back to heuristic tags.")
         return heuristic_tags(description)
@@ -193,37 +281,73 @@ def call_gemini_for_tags(description: str) -> List[str]:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-        prompt = (
+        
+        # Build prompt with description and sources
+        prompt_parts = [
             "You are a grant tagging classifier.\n"
-            "Given the following grant description, choose ALL relevant tags from "
+            "Given the following grant information, choose ALL relevant tags from "
             "this predefined list ONLY (no new tags):\n"
             f"{PREDEFINED_TAGS}\n\n"
             "Return ONLY a JSON array of strings, e.g. [\"agriculture\", \"education\"]. "
             "Do not include any additional text.\n\n"
             f"Grant description:\n{description}"
+        ]
+        
+        if website_urls and len(website_urls) > 0:
+            prompt_parts.append(f"\n\nWebsite URLs to consider:\n" + "\n".join(f"- {url}" for url in website_urls))
+        
+        if document_urls and len(document_urls) > 0:
+            prompt_parts.append(f"\n\nDocument URLs (PDFs) to consider:\n" + "\n".join(f"- {url}" for url in document_urls))
+        
+        prompt_parts.append(
+            "\n\nAnalyze the grant description and the provided sources (if any) to extract "
+            "all relevant tags. Consider information from all sources when determining tags."
         )
+        
+        prompt = "".join(prompt_parts)
+        
         response = model.generate_content(prompt)
         text = (response.text or "").strip()
         logger.debug("Gemini raw response: %s", text)
 
         # Try to parse JSON array from the response text.
         import json
+        import re
 
-        tags = json.loads(text)
+        # Clean up response - remove markdown code blocks if present
+        text_clean = re.sub(r"^```json\s*", "", text, flags=re.MULTILINE)
+        text_clean = re.sub(r"^```\s*", "", text_clean, flags=re.MULTILINE)
+        text_clean = text_clean.strip()
+
+        tags = json.loads(text_clean)
         if not isinstance(tags, list):
             raise ValueError("Gemini response is not a list.")
 
-        # Normalize + filter to the allowed set
+        # Normalize + filter to the allowed set and deduplicate
         normalized = []
+        seen = set()
         for t in tags:
             if not isinstance(t, str):
                 continue
-            tag = t.strip()
-            if tag in PREDEFINED_TAGS and tag not in normalized:
-                normalized.append(tag)
+            tag = t.strip().lower()
+            # Check for exact match or near-synonyms (normalize hyphens/underscores)
+            tag_normalized = tag.replace("_", "-")
+            if tag_normalized in PREDEFINED_TAGS and tag_normalized not in seen:
+                normalized.append(tag_normalized)
+                seen.add(tag_normalized)
 
-        return normalized or heuristic_tags(description)
+        if normalized:
+            return normalized
+        
+        # If LLM required but returned empty, still fall back if allowed
+        if require_llm or has_sources:
+            logger.warning("Gemini returned no valid tags, but sources were provided. Using heuristic as fallback.")
+        
+        return heuristic_tags(description)
     except Exception as exc:  # noqa: BLE001 - we want any Gemini failure to be non-fatal
+        if require_llm or has_sources:
+            logger.exception("Gemini tagging failed with sources provided: %s", exc)
+            raise ValueError(f"Failed to process grant with sources using LLM: {exc}")
         logger.exception("Gemini tagging failed, using heuristic fallback: %s", exc)
         return heuristic_tags(description)
 
@@ -305,8 +429,28 @@ def add_grants() -> Any:
                 400,
             )
 
-        # Assign tags
-        tags = call_gemini_for_tags(grant["grant_description"])
+        # Assign tags - use LLM if sources are provided
+        website_urls = grant.get("website_urls")
+        document_urls = grant.get("document_urls")
+        has_sources = (website_urls and len(website_urls) > 0) or (document_urls and len(document_urls) > 0)
+        
+        try:
+            tags = call_gemini_for_tags(
+                grant["grant_description"],
+                website_urls=website_urls,
+                document_urls=document_urls,
+                require_llm=has_sources,
+            )
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "error": f"Invalid grant at index {idx}: {exc}",
+                    }
+                ),
+                400,
+            )
+        
         grant["tags"] = tags
         validated.append(grant)
 

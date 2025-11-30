@@ -2,6 +2,7 @@ import "./index.css";
 import { AdminTab } from "./components/AdminTab";
 import { UserTab } from "./components/UserTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
+import { Toaster } from './components/ui/toaster';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
           </TabsContent>
         </Tabs>
       </main>
+      <Toaster />
     </div>
   );
 }
