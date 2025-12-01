@@ -23,11 +23,25 @@ Full-stack example that classifies and stores agricultural grants with LLM-filte
 - **Design Refinement** (~30 minutes):
   - Layout adjustments and styling improvements
 
+### Additional Features Outside of Time Frame
+
+- JSON file upload to add grants (this feature was completed within the timeframe)
+- Improve tagging accuracy by parsing attached websites and documents
+- Discovering new tags
+- Filter by tag synonyms (synonyms are marked with a blue background in the multiselect)
+
+### Additional Nice-to-Haves
+
+- Production-ready environment for Flask, e.g., running in a Linux container with Gunicorn
+- Executing React in a container or in Vite, Vercel
+- Using React with Next JS to boost performance
+- Refactor code, extract functions, and improve code quality
+- using precise, well-formulated prompts for every task, e.g., "React best practices" or "Python best practices"
+
 ### Testing Notes
 
-- Tested with keyword-based tagging fallback (heuristic approach)
-- Both LLM-based (Gemini) and keyword-based tagging options are included
-- Currently using free tier Gemini API
+- Tested with both LLM-based tagging (Gemini) and keyword-based fallback (heuristic approach)
+- Not tested with Docker, as it crashed on my computer
 
 ## Stack
 
@@ -46,8 +60,8 @@ Environment variables:
 
 - `MONGO_URI` (default `mongodb://mongo:27017`)
 - `MONGO_DB_NAME` (default `grants_db`)
-- `MONGO_COLLECTION_NAME` (default `grants`)
 - `GEMINI_API_KEY` (required for real LLM tagging; if omitted, a heuristic fallback is used)
+- `GEMINI_MODEL_NAME` (default `gemini-2.5-flash`, specifies the Gemini model to use)
 
 Install and run locally:
 
@@ -151,6 +165,7 @@ For real LLM tagging in Docker, set `GEMINI_API_KEY` either:
 
   ```bash
   set GEMINI_API_KEY=your_key_here
+  set GEMINI_MODEL_NAME=gemini-2.5-flash
   docker compose up --build
   ```
 

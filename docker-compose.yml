@@ -17,9 +17,8 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=grants_db
-      - MONGO_COLLECTION_NAME=grants
-      # Set GEMINI_API_KEY in an .env file or environment variable for real tagging
-      # - GEMINI_API_KEY=your_api_key_here
+      - GEMINI_API_KEY=
+      - GEMINI_MODEL_NAME=gemini-2.5-flash
     depends_on:
       - mongo
     ports:

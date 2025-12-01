@@ -124,16 +124,18 @@ export function AdminTab() {
         description: "Grant added successfully.",
         variant: "success",
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      // Keep it simple and display generic error below the form button
+      const errorMessage =
+        err.response?.data?.error || "Failed to add grant. Please try again.";
+      // Update form error message
       formMethods.setError("root", {
         type: "server",
-        message: "Failed to add grant. Please try again.",
+        message: errorMessage,
       });
       toast({
         title: "Error!",
-        description: "Failed to add grant. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -191,15 +193,15 @@ export function AdminTab() {
         description: `Successfully uploaded ${payload.length} grants.`,
         variant: "success",
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setJsonUploadError(
-        "Failed to process JSON file. Ensure it matches the expected format."
-      );
+      const errorMessage =
+        err.response?.data?.error ||
+        "Failed to process JSON file. Ensure it matches the expected format.";
+      setJsonUploadError(errorMessage);
       toast({
         title: "Error!",
-        description:
-          "Failed to process JSON file. Ensure it matches the expected format.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
